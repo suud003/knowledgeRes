@@ -1,0 +1,12 @@
+# Python dependencies for huashu-slides
+# Requires Python >= 3.10
+
+# Image generation - Multi-provider support
+google-genai>=1.0.0    # Google Gemini (optional)
+zhipuai>=2.0.0         # 智谱 GLM CogView (optional)
+pillow>=10.0.0
+httpx[socks]
+
+# Slide creation utilities
+markdown>=3.5.0
+jinja2>=3.1.0

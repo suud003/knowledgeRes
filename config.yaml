@@ -1,0 +1,85 @@
+# Personal Assistant 配置
+# 复制此文件为 config.yaml 并填入实际值
+
+# 飞书 API 配置（可选）
+# 如需同步飞书多维表格，请在 https://open.feishu.cn/app 创建应用获取
+feishu:
+  app_id: "cli_xxxxxxxxxxxx"
+  app_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  bases:
+    - name: "个人笔记"
+      app_token: "xxxxxxxxxxxxxx"
+      table_id: "tblxxxxxxxx"
+      default_topic: "reflection"
+      fields:
+        title: "标题"
+        content: "内容"
+        tags: "标签"
+        created_time: "创建时间"
+
+# Context 主题配置
+context:
+  core_topics:
+    personal:
+      name: "个人信息"
+      description: "个人身份、联系方式等相关信息"
+      keywords: ["个人资料", "联系方式", "地址", "身份证", "姓名", "电话"]
+
+    writing:
+      name: "写作爱好"
+      description: "写作相关的内容和想法"
+      keywords: ["文章", "写作", "灵感", "读书笔记", "随笔", "创作"]
+
+    tasks:
+      name: "任务管理"
+      description: "任务和日程安排"
+      keywords: ["待办", "任务", "TODO", "截止日期", "计划", "安排"]
+
+    preferences:
+      name: "个人偏好"
+      description: "个人喜好和设置"
+      keywords: ["喜欢", "偏好", "设置", "习惯", "推荐", "收藏"]
+
+    reflection:
+      name: "日记反思"
+      description: "每日情绪记录、反思和自我觉察"
+      keywords: ["情绪", "反思", "心情", "感受", "日记", "期许", "事件"]
+
+    product:
+      name: "产品思考"
+      description: "产品经理相关工作、思考和笔记"
+      keywords: ["产品经理", "产品感", "商业模式", "用户观察", "增长", "UI", "UX"]
+
+    work:
+      name: "工作记录"
+      description: "工作日记、复盘、经验"
+      keywords: ["工作日记", "复盘", "团队管理", "面试", "招聘"]
+
+    reading:
+      name: "阅读学习"
+      description: "读书笔记、待读清单、知识整理"
+      keywords: ["阅读", "读书笔记", "知识体系", "思维模型"]
+
+    ideas:
+      name: "灵感想法"
+      description: "灵光一闪、创意点子"
+      keywords: ["灵光一闪", "想法", "创意", "金句"]
+
+    ai:
+      name: "AI 相关"
+      description: "AI 产品、技术、思考"
+      keywords: ["AI", "大模型", "ChatGPT", "Claude", "prompt", "人工智能"]
+
+  custom_topics: {}
+
+# 数据路由配置
+routing:
+  strategy: "keyword_match"
+  threshold: 0.15
+  allow_multi_topic: true
+
+# 同步配置
+sync:
+  raw_dir: "data/raw"
+  context_dir: "data/context"
+  keep_history: false

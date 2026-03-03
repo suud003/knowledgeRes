@@ -1,0 +1,67 @@
+# Personal Assistant 配置示例
+# 复制此文件为 config.yaml 并填入实际值
+
+# 飞书 API 配置
+feishu:
+  app_id: "cli_xxxxxxxxxxxx"
+  app_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  # 多维表格配置
+  bases:
+    - name: "个人笔记"
+      app_token: "xxxxxxxxxxxxxx"
+      table_id: "tblxxxxxxxx"
+      # 字段映射
+      fields:
+        title: "标题"
+        content: "内容"
+        tags: "标签"
+        created_time: "创建时间"
+
+# Context 主题配置
+context:
+  # 预设核心主题（可修改规则，不建议删除）
+  core_topics:
+    personal:
+      name: "个人信息"
+      description: "个人身份、联系方式等相关信息"
+      keywords: ["个人资料", "联系方式", "地址", "身份证", "姓名", "电话"]
+      
+    writing:
+      name: "写作爱好"
+      description: "写作相关的内容和想法"
+      keywords: ["文章", "写作", "灵感", "读书笔记", "随笔", "创作"]
+      
+    tasks:
+      name: "任务管理"
+      description: "任务和日程安排"
+      keywords: ["待办", "任务", "TODO", "截止日期", "计划", "安排"]
+      
+    preferences:
+      name: "个人偏好"
+      description: "个人喜好和设置"
+      keywords: ["喜欢", "偏好", "设置", "习惯", "推荐", "收藏"]
+
+  # 用户自定义主题
+  custom_topics: {}
+    # project_a:
+    #   name: "项目A"
+    #   description: "项目A相关记录"
+    #   keywords: ["项目A", "ProjectA"]
+
+# 数据路由配置
+routing:
+  # 路由策略: keyword_match (关键词匹配) | ai_analysis (AI分析 - 预留)
+  strategy: "keyword_match"
+  # 关键词匹配阈值 (0.0-1.0)
+  threshold: 0.3
+  # 是否允许一条记录属于多个主题
+  allow_multi_topic: true
+
+# 同步配置
+sync:
+  # 原始数据保存目录
+  raw_dir: "data/raw"
+  # Context 输出目录
+  context_dir: "data/context"
+  # 是否保留历史版本
+  keep_history: false
