@@ -1,11 +1,15 @@
-# Moos - 人机协作的知识操作系统
+# Yogurt - 人机协作的知识操作系统
 
 > **不是工具，而是搭档。**
 > 
-> 一套基于 Claude Code 的个人知识管理系统，让你和 AI 共同构建可持续运转的知识基础设施。
+> 一套基于 MCP 协议的个人知识管理系统，内置丰富的自定义指令和 Skill 扩展，支持 **CodeBuddy** / **Cursor** 等 AI IDE，让你和 AI 共同构建可持续运转的知识基础设施。
+>
+> 只需一句 `/collect`、`/note`、`/plan`，AI 就能理解你的意图并自动执行。
 
 <p align="center">
   <img src="https://img.shields.io/badge/MCP-Protocol-blue" alt="MCP">
+  <img src="https://img.shields.io/badge/CodeBuddy-Supported-orange" alt="CodeBuddy">
+  <img src="https://img.shields.io/badge/Cursor-Supported-yellow" alt="Cursor">
   <img src="https://img.shields.io/badge/Obsidian-Compatible-purple" alt="Obsidian">
   <img src="https://img.shields.io/badge/Ship--Learn--Next-Framework-green" alt="SLN">
 </p>
@@ -16,7 +20,7 @@
 
 ### 1. 人机协作，而非人机交互
 
-传统工具是「你提需求，它给结果」的主仆关系。Moos 是「共同建设」的搭档关系：
+传统工具是「你提需求，它给结果」的主仆关系。Yogurt 是「共同建设」的搭档关系：
 
 - 你提供思路和方向
 - AI 理解意图 → 调用上下文 → 制定方案 → 推动执行
@@ -70,9 +74,29 @@ links: ["[[MCP]]", "[[RAG]]"]
 
 不再混淆「我的观点」和「他人的观点」。
 
-### 5. 主题自动演进
+### 5. 自定义指令系统
 
-传统工具的主题是静态配置。Moos 的主题是**动态生长**的：
+内置 **11 个即用型自定义指令**，覆盖知识管理全流程：
+
+| 指令 | 功能 | 说明 |
+|------|------|------|
+| `/collect` | 收集文章 | 抓取网页/文章，生成 Obsidian 格式存储 |
+| `/note` | 快速笔记 | 随手记录想法，自动归类到主题 |
+| `/save` | 保存内容 | 将对话中的内容保存为知识文件 |
+| `/digest` | 内容摘要 | 对长文/多篇文章生成结构化摘要 |
+| `/news` | 资讯追踪 | 获取 RSS 订阅的最新资讯 |
+| `/search` | 知识搜索 | 在知识库中搜索已有内容 |
+| `/topics` | 主题管理 | 查看/管理所有知识主题 |
+| `/plan` | 创建计划 | 创建 Ship-Learn-Next 实践计划 |
+| `/track` | 追踪进度 | 追踪 SLN 计划执行情况 |
+| `/recent` | 最近动态 | 查看近期知识库变更 |
+| `/sync` | 同步数据 | 同步飞书等外部数据源 |
+
+> 💡 所有指令均可在 AI 对话中直接使用，也可通过 `.codebuddy/commands/` 目录自行扩展。
+
+### 6. 主题自动演进
+
+传统工具的主题是静态配置。Yogurt 的主题是**动态生长**的：
 
 1. **发现** - AI 分析内容，识别潜在新主题
 2. **创建** - 自动创建主题，设置关键词
@@ -87,22 +111,14 @@ links: ["[[MCP]]", "[[RAG]]"]
 /list_topics
 ```
 
-### 6. MCP 原生集成
+### 7. MCP 原生集成
 
-通过 **Model Context Protocol** 与 Claude Code 深度集成：
+通过 **Model Context Protocol** 与 **CodeBuddy** / **Cursor** 深度集成：
 
-```json
-{
-  "mcpServers": {
-    "personal-assistant": {
-      "command": "python",
-      "args": ["-m", "pa.mcp_server"]
-    }
-  }
-}
-```
+- **CodeBuddy**：在项目根目录 `.codebuddy/mcp.json` 中配置
+- **Cursor**：在项目根目录 `.cursor/mcp.json` 中配置
 
-无需额外界面，直接在对话中使用：
+无需额外界面，直接在 AI 对话中使用：
 
 ```
 你: 收集这篇文章 https://example.com/ai-agent
@@ -121,7 +137,7 @@ AI: [调用 create_ship_plan] 计划已创建，4 周迭代周期
 
 ### 极简主义
 
-- **无向量数据库** - 依赖 Claude Code 200K context 处理知识库
+- **无向量数据库** - 依赖 AI IDE 的大上下文窗口处理知识库
 - **本地优先** - 所有数据存储于本地文件系统
 - **Git 版本控制** - 每次变更可追溯，GitHub 私人仓库备份
 
@@ -143,11 +159,16 @@ Moos/
 │   └── 📁 topics/manager.py     # 主题管理器
 │
 ├── 📁 skills/                   # Skill 扩展
-│   └── 📁 ship-learn-next/      # 实践学习框架
+│   ├── 📁 ship-learn-next/      # 实践学习框架
+│   └── 📁 huashu-slides/        # 华书幻灯片生成
 │
-└── 📁 .codebuddy/rules/         # 项目规则
-    ├── 📄 data-file-management.md
-    └── 📄 git-backup.md
+├── 📁 .codebuddy/               # CodeBuddy 配置
+│   ├── 📁 commands/             # 自定义指令（11 个）
+│   ├── 📁 rules/                # 项目规则
+│   └── 📄 mcp.json              # MCP 服务器配置
+│
+└── 📁 .cursor/                  # Cursor 配置（可选）
+    └── 📄 mcp.json              # MCP 服务器配置
 ```
 
 ---
@@ -177,9 +198,11 @@ cp config.example.yaml config.yaml
 # 编辑 config.yaml，添加飞书凭证（可选）
 ```
 
-### 3. 启动 MCP Server
+### 3. 配置 MCP Server
 
-在 Claude Code 配置中添加（**关键：必须设置正确的 cwd 参数**）：
+#### 方式一：CodeBuddy（推荐）
+
+在项目根目录创建 `.codebuddy/mcp.json`：
 
 ```json
 {
@@ -187,7 +210,25 @@ cp config.example.yaml config.yaml
     "personal-assistant": {
       "command": "python",
       "args": ["-m", "pa.mcp_server"],
-      "cwd": "g:\\tianyishao\\Moos-share"
+      "cwd": "<项目绝对路径>"
+    }
+  }
+}
+```
+
+> 💡 将 `<项目绝对路径>` 替换为你的实际路径，如 `g:\tianyishao\Moos-share`
+
+#### 方式二：Cursor
+
+在项目根目录创建 `.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "personal-assistant": {
+      "command": "python",
+      "args": ["-m", "pa.mcp_server"],
+      "cwd": "<项目绝对路径>"
     }
   }
 }
@@ -195,27 +236,29 @@ cp config.example.yaml config.yaml
 
 **重要提示：**
 - `cwd` 必须设置为项目的绝对路径
-- Windows路径需要使用双反斜杠 `\\` 转义
+- Windows 路径需要使用双反斜杠 `\\` 转义
 - 如果遇到权限错误，请参考 `MCP_CONFIG_GUIDE.md` 进行故障排除
 
 ### 4. 验证安装
 
-重启 Claude Code 后，可以通过以下命令验证 MCP 服务器是否正常工作：
+重启 IDE 后，在 AI 对话中测试 MCP 服务器是否正常工作：
 
-```bash
-# 在 Claude Code 中测试
-list_topics()  # 应该返回主题列表
-add_note(content="测试笔记", topic="test")  # 应该成功添加笔记
+```
+你: 列出所有主题
+AI: [调用 list_topics] 返回主题列表...
+
+你: 添加一条测试笔记
+AI: [调用 add_note] 已成功添加笔记
 ```
 
 如果遇到问题，请检查：
 1. 依赖是否安装：`pip install -e .`
-2. cwd路径是否正确
+2. `cwd` 路径是否正确
 3. 项目目录是否有读写权限
 
-### 4. 使用
+### 5. 开始使用
 
-重启 Claude Code，开始使用：
+在 AI 对话中直接使用：
 
 ```
 你: 收集 https://mp.weixin.qq.com/s/xxx 这篇文章
@@ -289,7 +332,8 @@ class MyCollector(BaseCollector):
 
 - **Obsidian**: https://obsidian.md
 - **MCP 协议**: https://modelcontextprotocol.io
-- **Claude Code**: https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
+- **CodeBuddy**: https://codebuddy.ai
+- **Cursor**: https://cursor.com
 
 ---
 
@@ -298,7 +342,7 @@ class MyCollector(BaseCollector):
 > "大多数人使用 AI 的方式是「消费」——让 AI 生成内容。
 > 我们做的是「建设」——和 AI 一起搭建一个可持续运转的基础设施。"
 
-Moos 不是一款「软件」，而是一种「工作方式」：
+Yogurt 不是一款「软件」，而是一种「工作方式」：
 - 你和 AI 共同定义问题
 - AI 理解上下文并执行
 - 你们一起迭代优化系统
