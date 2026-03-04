@@ -157,8 +157,8 @@ Moos/
 ### 1. 安装
 
 ```bash
-git clone https://github.com/youfangg/Moos.git
-cd Moos
+git clone https://github.com/suud003/knowledgeRes.git
+cd knowledgeRes
 
 # 创建虚拟环境
 python -m venv venv
@@ -179,7 +179,7 @@ cp config.example.yaml config.yaml
 
 ### 3. 启动 MCP Server
 
-在 Claude Code 配置中添加：
+在 Claude Code 配置中添加（**关键：必须设置正确的 cwd 参数**）：
 
 ```json
 {
@@ -187,11 +187,31 @@ cp config.example.yaml config.yaml
     "personal-assistant": {
       "command": "python",
       "args": ["-m", "pa.mcp_server"],
-      "cwd": "e:/你的路径/Moos"
+      "cwd": "g:\\tianyishao\\Moos-share"
     }
   }
 }
 ```
+
+**重要提示：**
+- `cwd` 必须设置为项目的绝对路径
+- Windows路径需要使用双反斜杠 `\\` 转义
+- 如果遇到权限错误，请参考 `MCP_CONFIG_GUIDE.md` 进行故障排除
+
+### 4. 验证安装
+
+重启 Claude Code 后，可以通过以下命令验证 MCP 服务器是否正常工作：
+
+```bash
+# 在 Claude Code 中测试
+list_topics()  # 应该返回主题列表
+add_note(content="测试笔记", topic="test")  # 应该成功添加笔记
+```
+
+如果遇到问题，请检查：
+1. 依赖是否安装：`pip install -e .`
+2. cwd路径是否正确
+3. 项目目录是否有读写权限
 
 ### 4. 使用
 
@@ -287,7 +307,7 @@ Moos 不是一款「软件」，而是一种「工作方式」：
 
 ## 📝 License
 
-MIT © youfangg
+MIT © tianyishao
 
 ---
 

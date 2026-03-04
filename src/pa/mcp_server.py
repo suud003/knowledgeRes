@@ -50,7 +50,9 @@ def get_topic_manager() -> TopicManager:
     global _topic_manager
     if _topic_manager is None:
         config = get_config()
-        _topic_manager = TopicManager(config, config.sync.raw_dir)
+        # 将相对路径转换为绝对路径
+        raw_dir = Path(config.sync.raw_dir).resolve()
+        _topic_manager = TopicManager(config, raw_dir)
     return _topic_manager
 
 
@@ -445,7 +447,7 @@ async def add_note(content: str, topic: str, title: str | None = None) -> str:
     """
     try:
         config = get_config()
-        context_dir = Path(config.sync.context_dir)
+        context_dir = Path(config.sync.context_dir).resolve()
         topic_manager = get_topic_manager()
 
         # 验证主题是否存在，不存在则自动创建
@@ -494,15 +496,195 @@ async def add_note(content: str, topic: str, title: str | None = None) -> str:
 
 
 @mcp.tool()
+async def excel_to_csv(file_path: str, output_dir: str | None = None) -> str:
+    """将 Excel 文件的所有 sheet 导出为 CSV 文件，返回内容后自动删除临时 CSV 文件.
+
+    适用于需要读取 Excel 内容的场景，会将每个 sheet 转为 CSV 并读取内容，
+    最后自动清理生成的临时 CSV 文件。
+
+    Args:
+        file_path: Excel 文件的路径（支持 .xlsx / .xls），可以是相对于项目根目录的路径或绝对路径
+        output_dir: CSV 输出目录（可选，默认与 Excel 文件同目录）
+
+    Returns:
+        所有 sheet 的 CSV 内容，以 Markdown 格式返回
+    """
+    # 注意：实际处理完全在内存中完成，不会在磁盘上生成临时文件
+    try:
+        import openpyxl
+        import csv
+        import io
+
+        excel_path = Path(file_path).resolve()
+        if not excel_path.exists():
+            return f"❌ 文件不存在: {excel_path}"
+
+        if not excel_path.suffix.lower() in (".xlsx", ".xls"):
+            return f"❌ 不支持的文件格式: {excel_path.suffix}，仅支持 .xlsx / .xls"
+
+        # 确定输出目录
+        out_dir = Path(output_dir).resolve() if output_dir else excel_path.parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # 打开 Excel 文件（处理样式兼容性问题）
+        # 某些 Excel 文件包含 openpyxl 无法解析的样式（如 Fill），需要绕过
+        import warnings
+
+        wb = None
+
+        # 方法1: 直接加载 (read_only 模式，不解析样式)
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+        except (TypeError, ValueError, KeyError, IndexError):
+            pass
+
+        # 方法2: Patch stylesheet 解析，跳过有问题的样式 (read_only 模式)
+        if wb is None:
+            try:
+                from openpyxl.reader import excel as excel_reader
+                from openpyxl.styles import stylesheet as ss_module
+
+                _orig_apply = getattr(ss_module, "apply_stylesheet", None)
+                _orig_apply_in_reader = getattr(excel_reader, "apply_stylesheet", None)
+
+                def _safe_apply_stylesheet(*args, **kwargs):
+                    """安全版本的 apply_stylesheet，遇到样式错误时跳过"""
+                    try:
+                        if _orig_apply:
+                            return _orig_apply(*args, **kwargs)
+                    except (TypeError, ValueError, KeyError, IndexError):
+                        pass
+
+                ss_module.apply_stylesheet = _safe_apply_stylesheet
+                if hasattr(excel_reader, "apply_stylesheet"):
+                    excel_reader.apply_stylesheet = _safe_apply_stylesheet
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+                except (TypeError, ValueError, KeyError, IndexError):
+                    # read_only 也失败了，尝试普通模式
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            wb = openpyxl.load_workbook(excel_path, data_only=True)
+                    except (TypeError, ValueError, KeyError, IndexError):
+                        pass
+                finally:
+                    # 恢复原始函数
+                    if _orig_apply:
+                        ss_module.apply_stylesheet = _orig_apply
+                    if _orig_apply_in_reader and hasattr(excel_reader, "apply_stylesheet"):
+                        excel_reader.apply_stylesheet = _orig_apply_in_reader
+            except Exception:
+                raise
+
+        if wb is None:
+            return "❌ 无法打开 Excel 文件，所有加载方式均失败"
+        sheet_names = wb.sheetnames
+
+        if not sheet_names:
+            wb.close()
+            return "❌ Excel 文件中没有任何 sheet"
+
+        results = []
+
+        for sheet_name in sheet_names:
+            ws = wb[sheet_name]
+
+            # 收集行数据（纯内存操作，不写磁盘）
+            rows_data = []
+            try:
+                for row in ws.iter_rows(values_only=True):
+                    # 将 None 转为空字符串
+                    rows_data.append([str(cell) if cell is not None else "" for cell in row])
+            except (IndexError, TypeError, KeyError) as row_err:
+                # 如果 values_only 模式失败，尝试逐个单元格读取
+                rows_data = []
+                try:
+                    for row in ws.iter_rows():
+                        row_values = []
+                        for cell in row:
+                            try:
+                                val = cell.value
+                                row_values.append(str(val) if val is not None else "")
+                            except (IndexError, TypeError, KeyError):
+                                row_values.append("")
+                        rows_data.append(row_values)
+                except (IndexError, TypeError, KeyError):
+                    results.append(f"### 📄 Sheet: {sheet_name}\n\n_(读取失败: {row_err})_\n")
+                    continue
+
+            if not rows_data:
+                results.append(f"### 📄 Sheet: {sheet_name}\n\n_(空白 sheet)_\n")
+                continue
+
+            # 在内存中生成 CSV 内容（不写磁盘，无需清理）
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerows(rows_data)
+            csv_content = csv_buffer.getvalue()
+
+            # 生成 Markdown 表格预览（前20行）
+            preview_rows = rows_data[:20]
+            if preview_rows:
+                # 表头
+                header = preview_rows[0]
+                md_table = "| " + " | ".join(header) + " |\n"
+                md_table += "| " + " | ".join(["---"] * len(header)) + " |\n"
+                # 数据行
+                for row in preview_rows[1:]:
+                    # 确保列数与表头一致
+                    padded_row = row + [""] * (len(header) - len(row)) if len(row) < len(header) else row[:len(header)]
+                    md_table += "| " + " | ".join(padded_row) + " |\n"
+
+                total_rows = len(rows_data) - 1  # 减去表头
+                truncated_msg = f"\n\n> ⚠️ 仅显示前 19 行数据，共 {total_rows} 行" if total_rows > 19 else ""
+
+                results.append(
+                    f"### 📄 Sheet: {sheet_name} ({total_rows} 行数据)\n\n"
+                    f"{md_table}{truncated_msg}\n"
+                )
+            else:
+                results.append(f"### 📄 Sheet: {sheet_name}\n\n_(空白 sheet)_\n")
+
+        wb.close()
+
+        # 组装完整结果
+        header_msg = (
+            f"## 📊 Excel 文件解析完成\n\n"
+            f"**源文件**: `{excel_path}`\n"
+            f"**Sheet 数量**: {len(sheet_names)}\n"
+            f"**Sheet 列表**: {', '.join(sheet_names)}\n\n"
+            f"---\n\n"
+        )
+
+        full_result = header_msg + "\n---\n\n".join(results)
+
+        return full_result
+
+    except ImportError:
+        return (
+            "❌ 缺少 openpyxl 依赖，请安装：\n\n"
+            "```bash\npip install openpyxl\n```"
+        )
+    except Exception as e:
+        return f"❌ 处理 Excel 文件失败: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
 async def collect_content(
     url: str,
-    html: str,
+    html: str | None = None,
     topic: str | None = None,
     download_images: bool = True,
 ) -> str:
     """收集网页内容到知识库（完整内容提取）.
 
-    只需提供 URL 和 HTML，自动完成：
+    只需提供 URL，自动完成：
+    - 自动抓取网页内容（也可手动传入 HTML）
     - 完整正文提取（保留原始内容，不做摘要）
     - 元数据解析（标题、作者、发布时间）
     - 图片本地化（可选）
@@ -510,7 +692,7 @@ async def collect_content(
 
     Args:
         url: 网页 URL
-        html: 网页 HTML 内容（使用 Playwright 抓取）
+        html: 网页 HTML 内容（可选，不传则自动从 URL 抓取）
         topic: 目标主题（可选，不传则自动推断为 'reading'）
         download_images: 是否下载图片到本地（默认 True）
 
@@ -523,9 +705,25 @@ async def collect_content(
         from urllib.parse import urlparse
 
         config = get_config()
-        raw_dir = Path(config.sync.raw_dir)
-        context_dir = Path(config.sync.context_dir)
+        raw_dir = Path(config.sync.raw_dir).resolve()
+        context_dir = Path(config.sync.context_dir).resolve()
         topic_manager = get_topic_manager()
+
+        # 0. 如果未提供 HTML，自动从 URL 抓取
+        fetch_msg = ""
+        if not html:
+            try:
+                is_reddit = WebExtractor._is_reddit_url(url)
+                needs_js = WebExtractor._needs_js_rendering(url)
+                html = await WebExtractor.fetch_html(url)
+                if is_reddit:
+                    fetch_msg = "🔗 Reddit 内容已通过 RSS/JSON API 抓取"
+                elif needs_js:
+                    fetch_msg = "🎭 HTML 已通过 Playwright（无头浏览器）抓取"
+                else:
+                    fetch_msg = "🌐 HTML 已自动抓取"
+            except RuntimeError as e:
+                return f"❌ 无法抓取网页: {e}"
 
         # 1. 选择合适的提取器
         domain = urlparse(url).netloc.lower()
@@ -537,7 +735,7 @@ async def collect_content(
         else:
             extractor = WebExtractor()
         
-        # 2. 提取完整内容
+        # 2. 提取完整内容（html 已确保存在）
         extracted = await extractor.extract(url, html)
         
         # 3. 处理图片（如果启用）
@@ -619,9 +817,10 @@ status: collected
         
         # 返回结果
         image_msg = f"\n🖼️ 图片: 已下载 {len(image_infos)} 张到本地" if image_infos else ""
+        fetch_line = f"\n{fetch_msg}" if fetch_msg else ""
         
         return f"""✅ 内容收集完成
-
+{fetch_line}
 📄 标题: {extracted.title}
 👤 作者: {extracted.author or '未知'}
 🏠 来源: {extracted.site_name or extracted.site_type}
@@ -806,7 +1005,7 @@ async def create_ship_plan(
     """
     try:
         config = get_config()
-        context_dir = Path(config.sync.context_dir)
+        context_dir = Path(config.sync.context_dir).resolve()
         topic_manager = get_topic_manager()
 
         # 验证主题
@@ -1109,8 +1308,251 @@ async def list_ship_plans() -> str:
         return f"获取计划列表失败: {type(e).__name__}: {e}"
 
 
+# ========== 每日资讯采集工具 ==========
+
+# 全局调度器实例缓存（用于交互式多轮对话）
+_scheduler_instance = None
+
+
+def _get_scheduler():
+    """获取调度器实例（带缓存，支持交互式多轮筛选）."""
+    global _scheduler_instance
+    if _scheduler_instance is None:
+        from pa.scheduler import DailyDigestScheduler
+        config = get_config()
+        _scheduler_instance = DailyDigestScheduler(config)
+    return _scheduler_instance
+
+
+def _reset_scheduler():
+    """重置调度器实例（开始新一轮采集时调用）."""
+    global _scheduler_instance
+    _scheduler_instance = None
+
+
+def _format_article_list(articles: list[dict[str, Any]]) -> str:
+    """将文章列表格式化为用户可读的编号列表."""
+    if not articles:
+        return "暂无新文章。"
+
+    lines: list[str] = []
+    for i, article in enumerate(articles, 1):
+        title = article.get("title", "无标题")
+        source = article.get("source_name", "未知来源")
+        url = article.get("url", "")
+        desc = article.get("description", "")
+        topic = article.get("topic", "")
+        pub_date = article.get("pub_date", "")
+
+        lines.append(f"### {i}. {title}")
+        lines.append(f"> 📌 来源: {source} | 🏷️ 主题: {topic} | 📅 {pub_date}")
+        if desc:
+            lines.append(f"\n{desc[:150]}{'...' if len(desc) > 150 else ''}")
+        if url:
+            lines.append(f"\n🔗 [查看原文]({url})")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def fetch_daily_digest() -> str:
+    """抓取 RSS 订阅源的最新文章，展示列表供用户筛选.
+
+    每天推送最新资讯，用户可以选择感兴趣的文章加入知识库。
+    工作流程：fetch_daily_digest → 用户选择 → save_selected_articles → 如果不够可以 fetch_more_articles
+
+    Returns:
+        文章列表（编号格式），供用户选择
+    """
+    try:
+        _reset_scheduler()
+        scheduler = _get_scheduler()
+
+        result = await scheduler.fetch_articles()
+
+        articles = result["articles"]
+        errors = result["errors"]
+
+        lines = [
+            "## 📰 今日资讯推送",
+            "",
+            f"共检查 **{result['sources_checked']}** 个订阅源，发现 **{result['total_found']}** 篇新文章：",
+            "",
+        ]
+
+        if articles:
+            lines.append(_format_article_list(articles))
+            lines.extend([
+                "---",
+                "",
+                "### 📋 操作指引",
+                "",
+                "请告诉我你想加入知识库的文章编号，例如：",
+                "- `保存 1, 3, 5` - 保存指定文章",
+                "- `全部保存` - 保存所有文章",
+                "- `跳过` - 全部跳过不保存",
+                "- `继续抓取` - 觉得不够？我再抓一批",
+                "",
+                "💡 所有展示过的文章（无论是否保存）下次不会重复推送。",
+            ])
+        else:
+            lines.append("暂时没有新的文章。所有已推送的文章都已标记，等待新内容产生。")
+
+        if errors:
+            lines.extend([
+                "",
+                "### ⚠️ 部分源抓取失败",
+            ])
+            for err in errors:
+                lines.append(f"- {err}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"❌ 资讯抓取失败: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def save_selected_articles(
+    indices: str,
+) -> str:
+    """保存用户选中的文章到知识库.
+
+    Args:
+        indices: 用户选择的文章编号，支持格式：
+                - "1,3,5" 或 "1, 3, 5" - 指定编号
+                - "all" 或 "全部" - 保存全部
+                - "skip" 或 "跳过" - 全部跳过
+
+    Returns:
+        保存结果
+    """
+    try:
+        scheduler = _get_scheduler()
+
+        # 解析用户输入
+        indices_str = indices.strip().lower()
+
+        if indices_str in ("skip", "跳过", "none", "无"):
+            count = scheduler.skip_all()
+            return f"✅ 已跳过全部 {count} 篇文章，下次不会重复推送。\n\n💡 如果还想继续看更多文章，可以调用 `fetch_more_articles`。"
+
+        if indices_str in ("all", "全部", "全部保存"):
+            # 保存所有文章
+            total = len(scheduler._current_batch)
+            selected = list(range(1, total + 1))
+        else:
+            # 解析编号
+            try:
+                selected = [
+                    int(x.strip())
+                    for x in indices_str.replace("，", ",").split(",")
+                    if x.strip().isdigit()
+                ]
+            except ValueError:
+                return "❌ 无法解析文章编号，请使用逗号分隔的数字，如 `1, 3, 5`"
+
+        if not selected:
+            return "❌ 未选择任何文章，请提供文章编号。"
+
+        result = scheduler.save_selected(selected)
+
+        lines = [
+            "## ✅ 保存完成",
+            "",
+            f"**已保存**: {result['saved_count']} 篇文章",
+            f"**已标记已读**: {result['marked_seen']} 篇（下次不再推送）",
+            "",
+        ]
+
+        if result["files_written"]:
+            lines.append("### 📁 保存位置")
+            for f in result["files_written"]:
+                filepath = Path(f)
+                lines.append(f"- `{filepath.parent.name}/{filepath.name}`")
+            lines.append("")
+
+        lines.extend([
+            "---",
+            "",
+            "💡 接下来你可以：",
+            "- `继续抓取` - 还想看更多文章",
+            "- 确认完成 - 本次采集结束",
+        ])
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"❌ 保存失败: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def fetch_more_articles() -> str:
+    """继续抓取更多文章（当用户觉得之前的推送数量不够时调用）.
+
+    从上次的位置继续往下抓取每个 RSS 源的更多内容。
+
+    Returns:
+        新一批文章列表
+    """
+    try:
+        scheduler = _get_scheduler()
+        result = await scheduler.fetch_more()
+
+        articles = result["articles"]
+        errors = result["errors"]
+
+        lines = [
+            "## 📰 更多资讯",
+            "",
+            f"继续抓取，又发现 **{result['total_found']}** 篇新文章：",
+            "",
+        ]
+
+        if articles:
+            lines.append(_format_article_list(articles))
+            lines.extend([
+                "---",
+                "",
+                "### 📋 操作指引",
+                "",
+                "请告诉我你想保存的文章编号：",
+                "- `保存 1, 3` - 保存指定文章",
+                "- `全部保存` - 全部保存",
+                "- `跳过` - 全部跳过",
+                "- `继续抓取` - 还想看更多",
+            ])
+        else:
+            lines.extend([
+                "暂时没有更多新文章了，所有源的内容都已抓取完毕。",
+                "",
+                "💡 你可以：",
+                "- 在 `config.yaml` 中添加更多 RSS 源",
+                "- 等待订阅源更新后再次抓取",
+            ])
+
+        if errors:
+            lines.extend([
+                "",
+                "### ⚠️ 错误",
+            ])
+            for err in errors:
+                lines.append(f"- {err}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"❌ 继续抓取失败: {type(e).__name__}: {e}"
+
+
 def main() -> None:
     """启动 MCP Server."""
+    # 设置正确的工作目录为项目根目录
+    import os
+    project_root = Path(__file__).parent.parent.parent
+    os.chdir(project_root)
+    
     mcp.run()
 
 

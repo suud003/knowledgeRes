@@ -99,7 +99,7 @@ class TopicManager:
             data_dir: 数据目录路径
         """
         self.config = config
-        self.data_dir = Path(data_dir)
+        self.data_dir = Path(data_dir).resolve()
         self.topics_file = self.data_dir / "topics.json"
 
         # 加载动态主题

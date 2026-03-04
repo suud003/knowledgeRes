@@ -289,12 +289,17 @@ def serve(host: str, port: int, transport: str) -> None:
         console.print(f"  监听地址: {host}:{port}")
 
     # 导入并启动 server
-    from pa.mcp_server import mcp
+    from pa.mcp_server import main
 
     if transport == "stdio":
-        mcp.run(transport="stdio")
+        main()
     else:
-        mcp.run(transport="sse", host=host, port=port)
+        # 对于SSE传输，需要设置环境变量
+        import os
+        os.environ["MCP_TRANSPORT"] = "sse"
+        os.environ["MCP_HOST"] = host
+        os.environ["MCP_PORT"] = str(port)
+        main()
 
 
 @cli.command()

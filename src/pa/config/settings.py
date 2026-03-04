@@ -59,6 +59,39 @@ class SyncConfig:
 
 
 @dataclass
+class ProxyConfig:
+    """网络代理配置."""
+
+    url: str = ""  # 代理地址，如 http://127.0.0.1:7890
+    domains: list[str] = field(default_factory=list)  # 需要走代理的域名
+
+    def get_proxy_for_url(self, url: str) -> str | None:
+        """根据 URL 判断是否需要代理，返回代理地址或 None."""
+        if not self.url:
+            return None
+        # 如果没配置 domains，所有请求都走代理
+        if not self.domains:
+            return self.url
+        # 检查 URL 的域名是否在代理列表中
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.lower()
+        bare_domain = domain.removeprefix("www.")
+        for d in self.domains:
+            d_lower = d.lower().removeprefix("www.")
+            if d_lower == bare_domain or d_lower == domain or d_lower in domain:
+                return self.url
+        return None
+
+
+@dataclass
+class FeedsConfig:
+    """RSS 采集配置."""
+
+    max_articles_per_source: int = 5
+    rss: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
 class Config:
     """主配置类."""
 
@@ -66,6 +99,8 @@ class Config:
     context: ContextConfig = field(default_factory=ContextConfig)
     routing: RoutingConfig = field(default_factory=RoutingConfig)
     sync: SyncConfig = field(default_factory=SyncConfig)
+    feeds: FeedsConfig = field(default_factory=FeedsConfig)
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Config:
@@ -114,7 +149,21 @@ class Config:
             keep_history=sync_data.get("keep_history", False),
         )
 
-        return cls(feishu=feishu, context=context, routing=routing, sync=sync)
+        # 解析 Feeds 配置
+        feeds_data = data.get("feeds", {})
+        feeds = FeedsConfig(
+            max_articles_per_source=feeds_data.get("max_articles_per_source", 5),
+            rss=feeds_data.get("rss", []),
+        )
+
+        # 解析代理配置
+        proxy_data = data.get("proxy", {})
+        proxy = ProxyConfig(
+            url=proxy_data.get("url", ""),
+            domains=proxy_data.get("domains", []),
+        )
+
+        return cls(feishu=feishu, context=context, routing=routing, sync=sync, feeds=feeds, proxy=proxy)
 
     def validate(self) -> list[str]:
         """验证配置，返回错误列表."""
@@ -162,4 +211,11 @@ def load_config(config_path: Path | str | None = None) -> Config:
     with open(config_file, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
-    return Config.from_dict(data)
+    config = Config.from_dict(data)
+    
+    # 将相对路径解析为绝对路径
+    config_dir = config_file.parent
+    config.sync.raw_dir = str((config_dir / config.sync.raw_dir).resolve())
+    config.sync.context_dir = str((config_dir / config.sync.context_dir).resolve())
+    
+    return config

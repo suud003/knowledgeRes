@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "personal-assistant": {
+      "command": "python",
+      "args": ["-m", "pa.mcp_server"],
+      "cwd": "g:\\tianyishao\\Moos-share"
+    }
+  }
+}
