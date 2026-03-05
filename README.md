@@ -10,7 +10,6 @@
   <img src="https://img.shields.io/badge/MCP-Protocol-blue" alt="MCP">
   <img src="https://img.shields.io/badge/CodeBuddy-Supported-orange" alt="CodeBuddy">
   <img src="https://img.shields.io/badge/Cursor-Supported-yellow" alt="Cursor">
-  <img src="https://img.shields.io/badge/Obsidian-Compatible-purple" alt="Obsidian">
   <img src="https://img.shields.io/badge/Ship--Learn--Next-Framework-green" alt="SLN">
 </p>
 
@@ -42,27 +41,7 @@ SHIP (交付) → LEARN (反思) → NEXT (迭代)
 - **LEARN**: 每周必须有反思（什么有效、什么无效、关键洞察）
 - **NEXT**: 每周必须有改进（基于反思的调整）
 
-### 3. Obsidian 原生兼容
-
-输出的 Markdown 100% 兼容 Obsidian：
-
-```yaml
----
-created: "2026-03-02 14:30:00"
-tags: ["ai/agent/claude", "collected"]
-source-type: collected
-source: articles
-url: "https://example.com/article"
-links: ["[[MCP]]", "[[RAG]]"]
----
-```
-
-- ✅ **Frontmatter** - 完整的元数据
-- ✅ **层级标签** - `ai/agent/claude` 格式
-- ✅ **双向链接** - `[[概念]]` 自动识别
-- ✅ **图谱可视化** - Obsidian Graph View
-
-### 4. 内容身份分离
+### 3. 内容身份分离
 
 知识管理中，**内容的来源决定了它的价值**：
 
@@ -70,17 +49,17 @@ links: ["[[MCP]]", "[[RAG]]"]
 |------|----------|------|
 | **原生内容** | `context/__created/` | 你的思考、创作、复盘 |
 | **收集内容** | `context/__collected/` | 外部文章、笔记、资料 |
-| **原始数据** | `raw/` | AI 生成、同步备份（Git 忽略）|
+| **原始数据** | `raw/` | AI 生成、同步备份 |
 
 不再混淆「我的观点」和「他人的观点」。
 
-### 5. 自定义指令系统
+### 4. 自定义指令系统
 
 内置 **11 个即用型自定义指令**，覆盖知识管理全流程：
 
 | 指令 | 功能 | 说明 |
 |------|------|------|
-| `/collect` | 收集文章 | 抓取网页/文章，生成 Obsidian 格式存储 |
+| `/collect` | 收集文章 | 抓取网页/文章，生成 Markdown 格式存储 |
 | `/note` | 快速笔记 | 随手记录想法，自动归类到主题 |
 | `/save` | 保存内容 | 将对话中的内容保存为知识文件 |
 | `/digest` | 内容摘要 | 对长文/多篇文章生成结构化摘要 |
@@ -90,11 +69,11 @@ links: ["[[MCP]]", "[[RAG]]"]
 | `/plan` | 创建计划 | 创建 Ship-Learn-Next 实践计划 |
 | `/track` | 追踪进度 | 追踪 SLN 计划执行情况 |
 | `/recent` | 最近动态 | 查看近期知识库变更 |
-| `/sync` | 同步数据 | 同步飞书等外部数据源 |
+| `/sync` | 同步数据 | 同步外部数据源 |
 
 > 💡 所有指令均可在 AI 对话中直接使用，也可通过 `.codebuddy/commands/` 目录自行扩展。
 
-### 6. 主题自动演进
+### 5. 主题自动演进
 
 传统工具的主题是静态配置。Yogurt 的主题是**动态生长**的：
 
@@ -111,7 +90,7 @@ links: ["[[MCP]]", "[[RAG]]"]
 /list_topics
 ```
 
-### 7. MCP 原生集成
+### 6. MCP 原生集成
 
 通过 **Model Context Protocol** 与 **CodeBuddy** / **Cursor** 深度集成：
 
@@ -122,7 +101,7 @@ links: ["[[MCP]]", "[[RAG]]"]
 
 ```
 你: 收集这篇文章 https://example.com/ai-agent
-AI: [调用 collect_content] 已收集，生成 Obsidian 格式，存储到 __collected/articles/ai/
+AI: [调用 collect_content] 已收集，生成 Markdown 格式，存储到 __collected/articles/ai/
 
 你: 记录一下今天关于 Agent 的新想法
 AI: [调用 add_note] 已记录到 raw/generated/work/
@@ -146,7 +125,7 @@ AI: [调用 create_ship_plan] 计划已创建，4 周迭代周期
 ```
 Moos/
 ├── 📁 data/
-│   ├── 📁 context/              # Obsidian Vault（Git 备份）
+│   ├── 📁 context/              # 知识库（Git 备份）
 │   │   ├── 📁 __created/        # 你的原创内容 ⭐
 │   │   └── 📁 __collected/      # 收集的内容 📥
 │   ├── 📁 docs/                 # 项目文档
@@ -189,18 +168,9 @@ venv\Scripts\activate  # Windows
 pip install -e .
 ```
 
-### 2. 配置
+### 2. 配置 MCP Server
 
-```bash
-# 复制示例配置
-cp config.example.yaml config.yaml
-
-# 编辑 config.yaml，添加飞书凭证（可选）
-```
-
-### 3. 配置 MCP Server
-
-#### 方式一：CodeBuddy（推荐）
+#### CodeBuddy（推荐）
 
 在项目根目录创建 `.codebuddy/mcp.json`：
 
@@ -218,28 +188,11 @@ cp config.example.yaml config.yaml
 
 > 💡 将 `<项目绝对路径>` 替换为你的实际路径，如 `g:\tianyishao\Moos-share`
 
-#### 方式二：Cursor
-
-在项目根目录创建 `.cursor/mcp.json`：
-
-```json
-{
-  "mcpServers": {
-    "personal-assistant": {
-      "command": "python",
-      "args": ["-m", "pa.mcp_server"],
-      "cwd": "<项目绝对路径>"
-    }
-  }
-}
-```
-
 **重要提示：**
 - `cwd` 必须设置为项目的绝对路径
 - Windows 路径需要使用双反斜杠 `\\` 转义
-- 如果遇到权限错误，请参考 `MCP_CONFIG_GUIDE.md` 进行故障排除
 
-### 4. 验证安装
+### 3. 验证安装
 
 重启 IDE 后，在 AI 对话中测试 MCP 服务器是否正常工作：
 
@@ -256,13 +209,13 @@ AI: [调用 add_note] 已成功添加笔记
 2. `cwd` 路径是否正确
 3. 项目目录是否有读写权限
 
-### 5. 开始使用
+### 4. 开始使用
 
 在 AI 对话中直接使用：
 
 ```
 你: 收集 https://mp.weixin.qq.com/s/xxx 这篇文章
-AI: 已抓取页面，提取正文，生成摘要，存储到 __collected/articles/ideas/
+AI: 已抓取页面，提取正文，生成 Markdown 格式，存储到 __collected/articles/ideas/
 
 你: 帮我创建一个关于 AI Agent 的实践计划
 AI: 已创建 Ship-Learn-Next 计划，4 周周期，第一周聚焦...
@@ -276,10 +229,10 @@ AI: 已创建 Ship-Learn-Next 计划，4 周周期，第一周聚焦...
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   数据源     │────▶│  AI 处理器   │────▶│  知识库      │
 │             │     │             │     │             │
-│ • 飞书      │     │ • 内容理解   │     │ • Obsidian  │
-│ • Flomo     │     │ • 主题分类   │     │ • 双链接     │
-│ • 网页      │     │ • 格式转换   │     │ • 图谱       │
-│ • 微信文章  │     │ • 摘要生成   │     │             │
+│ • Flomo     │     │ • 内容理解   │     │ • Markdown  │
+│ • 网页      │     │ • 主题分类   │     │ • 双链接     │
+│ • 微信文章  │     │ • 格式转换   │     │ • 图谱       │
+│             │     │ • 摘要生成   │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘
                                                │
                                                ▼
@@ -298,7 +251,7 @@ AI: 已创建 Ship-Learn-Next 计划，4 周周期，第一周聚焦...
 
 | 场景 | 如何使用 | 收益 |
 |------|----------|------|
-| **知识工作者** | 收集文章 → AI 整理 → Obsidian 深度阅读 | 读得少但用得深 |
+| **知识工作者** | 收集文章 → AI 整理 → 深度阅读 | 读得少但用得深 |
 | **产品经理** | Ship-Learn-Next 实践 → 每周产品分析 | 从消费者到建设者 |
 | **开发者** | MCP 扩展开发 → 自动化工作流 | 构建个人工具链 |
 | **终身学习者** | 多源数据汇聚 → 主题自动演进 | 知识网络自生长 |
@@ -330,7 +283,6 @@ class MyCollector(BaseCollector):
 
 ## 📚 相关资源
 
-- **Obsidian**: https://obsidian.md
 - **MCP 协议**: https://modelcontextprotocol.io
 - **CodeBuddy**: https://codebuddy.ai
 - **Cursor**: https://cursor.com
