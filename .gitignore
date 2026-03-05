@@ -10,19 +10,29 @@ config.yaml
 # ============================
 # 个人知识库数据（隐私保护）
 # ============================
-# 所有知识库数据文件
-data/raw/
-data/context/
-data/assets/
+# 忽略目录下的文件内容，但保留 .gitkeep 以体现目录结构
+data/raw/**
+data/context/**
+data/assets/**
+!data/raw/**/
+!data/context/**/
+!data/assets/**/
+!data/raw/**/.gitkeep
+!data/context/**/.gitkeep
+!data/assets/**/.gitkeep
 
 # 原始工作数据
-raw data/
+raw data/**
+!raw data/**/
+!raw data/**/.gitkeep
 
 # 文章内容临时文件
 article_content.md
 
 # 个人学习计划（含个人信息）
-skills/ship-learn-next/plans/
+skills/ship-learn-next/plans/**
+!skills/ship-learn-next/plans/**/
+!skills/ship-learn-next/plans/**/.gitkeep
 
 # ============================
 # 虚拟环境

@@ -434,13 +434,18 @@ async def search_recent(days: int = 7, topic: str | None = None) -> str:
 
 
 @mcp.tool()
-async def add_note(content: str, topic: str, title: str | None = None) -> str:
+async def add_note(content: str, topic: str, title: str | None = None, append_to: str | None = None) -> str:
     """快速添加笔记到指定主题.
+
+    支持两种模式：
+    - 新建模式（默认）：创建新的笔记文件
+    - 追加模式（指定 append_to）：追加内容到已有文件末尾
 
     Args:
         content: 笔记内容
         topic: 主题 key（如 'reflection', 'writing', 'tasks'）
         title: 笔记标题，不传则使用时间戳
+        append_to: 要追加到的已有文件路径（相对于 context_dir 或绝对路径），指定此参数时进入追加模式
 
     Returns:
         添加结果
@@ -461,10 +466,62 @@ async def add_note(content: str, topic: str, title: str | None = None) -> str:
                 auto_created=True,
             )
 
-        # 使用 Obsidian 格式化器
-        formatter = ObsidianFormatter()
         now = datetime.now()
         note_title = title or f"笔记 {now.strftime('%H:%M')}"
+
+        # === 追加模式 ===
+        if append_to:
+            append_path = Path(append_to)
+            if not append_path.is_absolute():
+                append_path = context_dir / append_to
+            
+            if not append_path.exists():
+                return f"追加失败: 文件不存在 {append_path}"
+            
+            # 构造追加内容（带分隔线和时间戳）
+            append_content = (
+                f"\n\n---\n\n"
+                f"## 补充记录 ({now.strftime('%Y-%m-%d %H:%M')})\n\n"
+                f"{content}\n"
+            )
+            
+            with open(append_path, "a", encoding="utf-8") as f:
+                f.write(append_content)
+            
+            # 更新主题内容计数
+            topic_manager.increment_content_count(topic)
+
+            # iWiki 同步信息
+            iwiki_topic_mapping = {
+                "personal": 4018520218,
+                "writing": 4018520218,
+                "preferences": 4018520218,
+                "reflection": 4018520218,
+                "ideas": 4018520218,
+                "work": 4018520220,
+                "tasks": 4018520220,
+                "product": 4018520220,
+                "ai": 4018520230,
+                "reading": 4018520231,
+            }
+            iwiki_folder_id = iwiki_topic_mapping.get(topic, 4018520218)
+
+            return (
+                f"✅ 笔记已追加到已有文件 '{append_path.name}'\n"
+                f"文件: {append_path}\n"
+                f"模式: 追加\n"
+                f"\n"
+                f"📌 iWiki 同步信息:\n"
+                f"  - 模式: 追加到已有文档 (使用 saveDocumentParts)\n"
+                f"  - spaceid: 4010703137\n"
+                f"  - parentid: {iwiki_folder_id}\n"
+                f"  - title: {note_title}\n"
+                f"  - 请同步调用 iWiki saveDocumentParts 工具追加内容到已有文档"
+            )
+
+        # === 新建模式 ===
+        # 使用 Obsidian 格式化器
+        formatter = ObsidianFormatter()
 
         # 生成 Obsidian 格式内容
         formatted_content = formatter.format_note(
@@ -489,7 +546,33 @@ async def add_note(content: str, topic: str, title: str | None = None) -> str:
         # 更新主题内容计数
         topic_manager.increment_content_count(topic)
 
-        return f"✅ 笔记已添加到 '__created/{topic}'\n文件: {filepath}\n格式: Obsidian 兼容"
+        # iWiki 同步信息 - topic 到 iWiki 文件夹 ID 的映射
+        iwiki_topic_mapping = {
+            "personal": 4018520218,
+            "writing": 4018520218,
+            "preferences": 4018520218,
+            "reflection": 4018520218,
+            "ideas": 4018520218,
+            "work": 4018520220,
+            "tasks": 4018520220,
+            "product": 4018520220,
+            "ai": 4018520230,
+            "reading": 4018520231,
+        }
+        iwiki_folder_id = iwiki_topic_mapping.get(topic, 4018520218)
+
+        return (
+            f"✅ 笔记已添加到 '__created/{topic}'\n"
+            f"文件: {filepath}\n"
+            f"格式: Obsidian 兼容\n"
+            f"\n"
+            f"📌 iWiki 同步信息:\n"
+            f"  - spaceid: 4010703137\n"
+            f"  - parentid: {iwiki_folder_id}\n"
+            f"  - title: {note_title}\n"
+            f"  - contenttype: MD\n"
+            f"  - 请同步调用 iWiki createDocument 工具完成双写"
+        )
 
     except Exception as e:
         return f"添加失败: {type(e).__name__}: {e}"
@@ -1544,6 +1627,72 @@ async def fetch_more_articles() -> str:
 
     except Exception as e:
         return f"❌ 继续抓取失败: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def list_topic_notes(topic: str) -> str:
+    """列出指定主题下的所有本地笔记文件.
+
+    用于在添加笔记前查看已有文件，判断是否应追加到已有文件而非创建新文件。
+
+    Args:
+        topic: 主题 key（如 'work', 'personal', 'ai'）
+
+    Returns:
+        该主题下的文件列表及标题摘要
+    """
+    try:
+        config = get_config()
+        context_dir = Path(config.sync.context_dir).resolve()
+        target_dir = context_dir / "__created" / topic
+
+        if not target_dir.exists():
+            return f"主题 '{topic}' 目录不存在，暂无笔记文件。"
+
+        files = sorted(target_dir.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not files:
+            return f"主题 '{topic}' 目录为空，暂无笔记文件。"
+
+        lines = [
+            f"## 📂 主题 '{topic}' 下共有 {len(files)} 个笔记文件",
+            "",
+        ]
+
+        for f in files:
+            # 读取文件前几行提取标题
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    head_lines = []
+                    for i, line in enumerate(fh):
+                        if i >= 10:
+                            break
+                        head_lines.append(line.strip())
+
+                # 尝试从 YAML front matter 或 # 标题中提取
+                doc_title = f.stem
+                for line in head_lines:
+                    if line.startswith("# "):
+                        doc_title = line[2:].strip()
+                        break
+                    if line.startswith("title:"):
+                        doc_title = line[6:].strip().strip('"').strip("'")
+                        break
+
+                # 获取文件大小和修改时间
+                stat = f.stat()
+                mod_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+
+                lines.append(f"- **{doc_title}**")
+                lines.append(f"  文件: `{f.name}` | 路径: `{f}` | 修改: {mod_time}")
+                lines.append("")
+            except Exception:
+                lines.append(f"- {f.name} (读取失败)")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"列出失败: {type(e).__name__}: {e}"
 
 
 def main() -> None:
