@@ -81,16 +81,29 @@ class RSSCollector(BaseCollector):
         seen_ids = self._load_seen_ids()
 
         proxy = _get_proxy_for_url(self.feed_url)
-        client_kwargs: dict[str, Any] = dict(timeout=30, follow_redirects=True)
+        client_kwargs: dict[str, Any] = dict(timeout=4, follow_redirects=True)
         if proxy:
             client_kwargs["proxy"] = proxy
         async with httpx.AsyncClient(**client_kwargs) as client:
             resp = await client.get(self.feed_url, headers={
-                "User-Agent": "Mozilla/5.0 (Personal Assistant RSS Reader)"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             })
             resp.raise_for_status()
 
-        root = ElementTree.fromstring(resp.text)
+        # XML 解析容错：处理非标准 RSS 响应
+        resp_text = resp.text.strip()
+        if not resp_text or resp_text.startswith("<!DOCTYPE") or resp_text.startswith("<html"):
+            raise ValueError(f"响应不是有效的 RSS/XML 格式（可能返回了 HTML 页面）")
+        try:
+            root = ElementTree.fromstring(resp_text)
+        except ElementTree.ParseError as e:
+            # 尝试清理常见的 XML 问题后重新解析
+            import re
+            cleaned = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', '&amp;', resp_text)
+            try:
+                root = ElementTree.fromstring(cleaned)
+            except ElementTree.ParseError:
+                raise ValueError(f"RSS XML 解析失败: {e}")
 
         # 兼容 RSS 2.0 和 Atom 格式
         items = root.findall(".//item") or root.findall(
@@ -127,16 +140,28 @@ class RSSCollector(BaseCollector):
         seen_ids = self._load_seen_ids()
 
         proxy = _get_proxy_for_url(self.feed_url)
-        client_kwargs: dict[str, Any] = dict(timeout=30, follow_redirects=True)
+        client_kwargs: dict[str, Any] = dict(timeout=4, follow_redirects=True)
         if proxy:
             client_kwargs["proxy"] = proxy
         async with httpx.AsyncClient(**client_kwargs) as client:
             resp = await client.get(self.feed_url, headers={
-                "User-Agent": "Mozilla/5.0 (Personal Assistant RSS Reader)"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             })
             resp.raise_for_status()
 
-        root = ElementTree.fromstring(resp.text)
+        # XML 解析容错
+        resp_text = resp.text.strip()
+        if not resp_text or resp_text.startswith("<!DOCTYPE") or resp_text.startswith("<html"):
+            raise ValueError(f"响应不是有效的 RSS/XML 格式")
+        try:
+            root = ElementTree.fromstring(resp_text)
+        except ElementTree.ParseError as e:
+            import re
+            cleaned = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#)', '&amp;', resp_text)
+            try:
+                root = ElementTree.fromstring(cleaned)
+            except ElementTree.ParseError:
+                raise ValueError(f"RSS XML 解析失败: {e}")
         items = root.findall(".//item") or root.findall(
             ".//{http://www.w3.org/2005/Atom}entry"
         )

@@ -1407,9 +1407,15 @@ def _get_scheduler():
     return _scheduler_instance
 
 
-def _reset_scheduler():
-    """重置调度器实例（开始新一轮采集时调用）."""
+def _reset_scheduler(force_new: bool = False):
+    """重置调度器实例.
+
+    Args:
+        force_new: 如果为 True，同时清除本地缓存（强制全新开始）
+    """
     global _scheduler_instance
+    if force_new and _scheduler_instance is not None:
+        _scheduler_instance.reset_cache()
     _scheduler_instance = None
 
 
@@ -1439,33 +1445,74 @@ def _format_article_list(articles: list[dict[str, Any]]) -> str:
 
 
 @mcp.tool()
-async def fetch_daily_digest() -> str:
+async def fetch_daily_digest(force_refresh: bool = False) -> str:
     """抓取 RSS 订阅源的最新文章，展示列表供用户筛选.
 
-    每天推送最新资讯，用户可以选择感兴趣的文章加入知识库。
-    工作流程：fetch_daily_digest → 用户选择 → save_selected_articles → 如果不够可以 fetch_more_articles
+    采用分批抓取策略避免超时：每次调用抓取一批（4个源），自动缓存结果。
+    - 如果还有未抓取的批次，会提示继续调用本工具完成剩余批次
+    - 所有批次完成后展示完整文章列表
+    - 同一天内重复调用会复用缓存，除非 force_refresh=True
+
+    Args:
+        force_refresh: 是否强制刷新（清除今日缓存，重新开始抓取）
 
     Returns:
-        文章列表（编号格式），供用户选择
+        文章列表或分批进度提示
     """
     try:
-        _reset_scheduler()
         scheduler = _get_scheduler()
+
+        # 如果强制刷新，清除缓存重新开始
+        if force_refresh:
+            _reset_scheduler(force_new=True)
+            scheduler = _get_scheduler()
 
         result = await scheduler.fetch_articles()
 
-        articles = result["articles"]
+        batch_index = result["batch_index"]
+        total_batches = result["total_batches"]
+        completed = result["completed"]
+        batch_articles = result["articles"]
+        all_articles = result["all_articles"]
         errors = result["errors"]
+        all_errors = result["all_errors"]
 
+        # 如果还有未完成的批次，返回进度提示并提示继续调用
+        if not completed:
+            lines = [
+                "## 📰 资讯抓取进行中...",
+                "",
+                f"**进度**: 第 {batch_index + 1}/{total_batches} 批完成"
+                f"（本批抓到 {len(batch_articles)} 篇，累计 {len(all_articles)} 篇）",
+                "",
+            ]
+
+            if errors:
+                lines.append("**本批次错误**:")
+                for err in errors:
+                    lines.append(f"- {err}")
+                lines.append("")
+
+            remaining = total_batches - batch_index - 1
+            lines.extend([
+                f"还有 **{remaining}** 批待抓取，请继续调用 `fetch_daily_digest` 完成剩余批次。",
+                "",
+                "💡 无需传参，工具会自动从上次中断处继续。",
+            ])
+
+            return "\n".join(lines)
+
+        # 所有批次完成，展示完整列表
         lines = [
             "## 📰 今日资讯推送",
             "",
-            f"共检查 **{result['sources_checked']}** 个订阅源，发现 **{result['total_found']}** 篇新文章：",
+            f"共检查 **{result['total_sources']}** 个订阅源（{total_batches} 批次），"
+            f"发现 **{len(all_articles)}** 篇新文章：",
             "",
         ]
 
-        if articles:
-            lines.append(_format_article_list(articles))
+        if all_articles:
+            lines.append(_format_article_list(all_articles))
             lines.extend([
                 "---",
                 "",
@@ -1482,12 +1529,12 @@ async def fetch_daily_digest() -> str:
         else:
             lines.append("暂时没有新的文章。所有已推送的文章都已标记，等待新内容产生。")
 
-        if errors:
+        if all_errors:
             lines.extend([
                 "",
                 "### ⚠️ 部分源抓取失败",
             ])
-            for err in errors:
+            for err in all_errors:
                 lines.append(f"- {err}")
 
         return "\n".join(lines)
@@ -1701,7 +1748,14 @@ def main() -> None:
     import os
     project_root = Path(__file__).parent.parent.parent
     os.chdir(project_root)
-    
+
+    # 注册浏览器自动化工具（Playwright MCP 工具集）
+    try:
+        from pa.browser_tools import register_browser_tools
+        register_browser_tools(mcp)
+    except ImportError:
+        pass  # playwright 未安装时跳过
+
     mcp.run()
 
 

@@ -29,6 +29,11 @@ raw data/**
 # 文章内容临时文件
 article_content.md
 
+# iWiki 相关（内部文档系统，不对外展示）
+config/iwiki_mapping.json
+.codebuddy/skills/iwiki-doc/
+.codebuddy/skills/note-sync/
+
 # 个人学习计划（含个人信息）
 skills/ship-learn-next/plans/**
 !skills/ship-learn-next/plans/**/
