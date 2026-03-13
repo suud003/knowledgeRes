@@ -389,25 +389,57 @@ graph TD
    - 需要用户首次使用时提供 iWiki 空间ID（spaceid）和父目录ID（parentid）
    - 记录后续复用
 
-2. **发布日报**：使用 `createDocument` 创建新文档
-   ```
-   spaceid: 用户空间ID
-   parentid: 日报目录ID
-   title: "日报 - YYYY年MM月DD日"
-   body: 日报Markdown内容
-   contenttype: "MD"
-   ```
+2. **发布日报**：分两步创建（避免 JSON 渲染问题）
+   - **第一步**：使用 `createDocument` 创建空文档
+     ```
+     spaceid: 用户空间ID
+     parentid: 日报目录ID
+     title: "日报 - YYYY年MM月DD日"
+     body: " "
+     contenttype: "MD"
+     ```
+   - **第二步**：使用 `saveDocument` 写入正文内容
+     ```
+     docid: 上一步返回的文档ID
+     title: "日报 - YYYY年MM月DD日"
+     body: 日报Markdown内容
+     ```
 
-3. **发布周报**：使用 `createDocument` 创建新文档
-   ```
-   spaceid: 用户空间ID
-   parentid: 周报目录ID
-   title: "周报 - YYYY.MM.DD ~ MM.DD"
-   body: 周报Markdown内容
-   contenttype: "MD"
-   ```
+3. **发布周报**：分两步创建（同上）
+   - **第一步**：使用 `createDocument` 创建空文档
+     ```
+     spaceid: 用户空间ID
+     parentid: 周报目录ID
+     title: "周报 - YYYY.MM.DD ~ MM.DD"
+     body: " "
+     contenttype: "MD"
+     ```
+   - **第二步**：使用 `saveDocument` 写入正文内容
+     ```
+     docid: 上一步返回的文档ID
+     title: "周报 - YYYY.MM.DD ~ MM.DD"
+     body: 周报Markdown内容
+     ```
 
-4. **更新已有文档**：如果当天日报已存在，使用 `saveDocument` 更新
+4. **发布月报**：分两步创建（同上）
+   - **第一步**：使用 `createDocument` 创建空文档
+     ```
+     spaceid: 用户空间ID
+     parentid: 月报目录ID
+     title: "月报 - YYYY年MM月"
+     body: " "
+     contenttype: "MD"
+     ```
+   - **第二步**：使用 `saveDocument` 写入正文内容
+     ```
+     docid: 上一步返回的文档ID
+     title: "月报 - YYYY年MM月"
+     body: 月报Markdown内容
+     ```
+
+5. **更新已有文档**：如果当天日报已存在，使用 `saveDocument` 更新
+
+> ⚠️ **重要**：创建带内容的新文档时，**禁止**在 `createDocument` 的 `body` 中直接传入正文内容。必须先创建空文档，再用 `saveDocument` 写入内容。这是因为 `createDocument` 直接传入 body 可能导致 iWiki 将内容以 JSON ProseMirror 结构存储为纯文本，在页面上显示为 JSON 字符串而非格式化的 Markdown。
 
 ### 第六步：提取有用信息到工作文档
 

@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanBT 待办事项清单</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        header h1 {
+            font-size: 2em;
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 15px 0 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+            border-radius: 6px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 0.95em;
+            color: #aaa;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .controls button {
+            padding: 8px 18px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .controls button:hover {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        .section {
+            margin-bottom: 16px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .section-header:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .section-header .left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-header .arrow {
+            transition: transform 0.3s;
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        .section-header .arrow.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .section-header h2 {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #ddd;
+        }
+
+        .section-header .badge {
+            font-size: 0.75em;
+            background: rgba(0,210,255,0.15);
+            color: #00d2ff;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .section-body {
+            padding: 0 18px 14px;
+        }
+
+        .section-body.hidden {
+            display: none;
+        }
+
+        .subsection {
+            margin: 8px 0 8px 10px;
+        }
+
+        .subsection-title {
+            font-size: 0.9em;
+            color: #888;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .subsection-title .arrow {
+            transition: transform 0.3s;
+            font-size: 0.7em;
+            color: #666;
+        }
+
+        .subsection-title .arrow.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .subsection-body.hidden {
+            display: none;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 3px 0;
+            border-radius: 8px;
+            transition: background 0.2s;
+            gap: 10px;
+        }
+
+        .file-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .file-item input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.25);
+            border-radius: 5px;
+            cursor: pointer;
+            flex-shrink: 0;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .file-item input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            border-color: transparent;
+        }
+
+        .file-item input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .file-item label {
+            cursor: pointer;
+            flex: 1;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+
+        .file-item input[type="checkbox"]:checked + label {
+            opacity: 0.45;
+            text-decoration: line-through;
+        }
+
+        .file-name {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.88em;
+            color: #e8c170;
+        }
+
+        .file-desc {
+            font-size: 0.8em;
+            color: #777;
+        }
+
+        .icon {
+            font-size: 1em;
+            flex-shrink: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #555;
+            font-size: 0.8em;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            header h1 { font-size: 1.4em; }
+            .file-item { padding: 6px 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 PlanBT 待办事项清单</h1>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">0 / 0 已完成 (0%)</div>
+            <div class="controls">
+                <button onclick="toggleAll(true)">✅ 全部勾选</button>
+                <button onclick="toggleAll(false)">⬜ 全部取消</button>
+                <button onclick="expandAll(true)">📂 全部展开</button>
+                <button onclick="expandAll(false)">📁 全部折叠</button>
+                <button onclick="clearStorage()">🗑️ 重置进度</button>
+            </div>
+        </header>
+
+        <div id="todoList"></div>
+
+        <footer>PlanBT 项目文件待办清单 · 数据自动保存至浏览器本地存储</footer>
+    </div>
+
+    <script>
+        // PlanBT 项目文件结构数据
+        const data = [
+            {
+                section: "根目录",
+                icon: "📦",
+                files: [
+                    { name: "ModConfig.lua", desc: "Mod 注册配置" }
+                ]
+            },
+            {
+                section: "Gameplay / Config",
+                icon: "⚙️",
+                files: [
+                    { name: "PBRouteConfig.lua", desc: "PB协议路由配置" },
+                    { name: "SubsystemConfig.lua", desc: "子系统注册配置" },
+                    { name: "EventDefine.lua", desc: "事件定义" },
+                    { name: "MonsterConfig.lua", desc: "怪物配置" },
+                    { name: "ItemConfig.lua", desc: "物品配置" },
+                    { name: "ShopConfig.lua", desc: "商店配置" },
+                    { name: "SkinConfig.lua", desc: "皮肤配置" },
+                    { name: "ActiveConfig.lua", desc: "活跃检测配置" },
+                    { name: "DrawConfig.lua", desc: "抽卡配置" },
+                    { name: "RoundFlowTriggersCfg.lua", desc: "回合流程触发配置" },
+                    { name: "RebirthUIConfig.lua", desc: "重生UI配置" },
+                    { name: "OfflineCoinConfig.lua", desc: "离线金币配置" },
+                    { name: "EnumDefine.lua", desc: "枚举定义" },
+                    { name: "CreativeSubModeOverrideConfig.lua", desc: "CreativeSubMode覆盖配置" }
+                ]
+            },
+            {
+                section: "Gameplay / Core",
+                icon: "🎮",
+                files: [
+                    { name: "PlanBTGameMode.lua", desc: "游戏模式" },
+                    { name: "PlanBTGameState.lua", desc: "游戏状态" },
+                    { name: "PlanBTPlayerController.lua", desc: "玩家控制器" },
+                    { name: "PlanBTPlayerCharacter.lua", desc: "玩家角色" },
+                    { name: "PlanBTPlayerState.lua", desc: "玩家状态" },
+                    { name: "PlanBTNewFakeAIController.lua", desc: "假玩家控制器" }
+                ]
+            },
+            {
+                section: "Gameplay / Actor",
+                icon: "👾",
+                files: [
+                    { name: "MonsterBaseActor.lua", desc: "怪物基地" },
+                    { name: "MonsterActor.lua", desc: "怪物Actor" },
+                    { name: "MonsterFactoryActor.lua", desc: "怪物工厂" },
+                    { name: "MonsterRecycleBinActor.lua", desc: "怪物回收站" },
+                    { name: "MonsterCountdownBillboardActor.lua", desc: "倒计时广告牌" },
+                    { name: "CoinActor.lua", desc: "金币Actor" },
+                    { name: "DoorActor.lua", desc: "门Actor" },
+                    { name: "DrawActor.lua", desc: "抽卡区域Actor" },
+                    { name: "ShopActor.lua", desc: "商店区域Actor" },
+                    { name: "PartnerGhost.lua", desc: "伙伴宠物" }
+                ],
+                subsections: [
+                    {
+                        title: "Projectile（投掷物）",
+                        files: [
+                            { name: "Trap.lua", desc: "陷阱投掷物" },
+                            { name: "TrapCheckArea.lua", desc: "陷阱检测区域" }
+                        ]
+                    },
+                    {
+                        title: "Weapon（武器）",
+                        files: [
+                            { name: "PistalTaser.lua", desc: "电击枪" }
+                        ]
+                    }
+                ]
+            },
+            {
+                section: "Gameplay / Feature",
+                icon: "✨",
+                files: [
+                    { name: "MonsterInteractionFeature.lua", desc: "怪物交互Feature" },
+                    { name: "CoinFeature.lua", desc: "金币Feature" },
+                    { name: "PlayerRebirthFeature.lua", desc: "重生Feature" },
+                    { name: "MonsterWarehouseFeature.lua", desc: "仓库Feature" },
+                    { name: "SkinFeature.lua", desc: "皮肤Feature" },
+                    { name: "ActiveFeature.lua", desc: "活跃Feature" },
+                    { name: "NewbieGuideFeature.lua", desc: "新手引导Feature" },
+                    { name: "PlayerPartnerGhostFeature.lua", desc: "伙伴宠物Feature" }
+                ]
+            },
+            {
+                section: "Gameplay / SubSystem",
+                icon: "🔧",
+                files: [
+                    { name: "MonsterBaseSubsystem.lua", desc: "怪物基地子系统" },
+                    { name: "PlanBTMainSubsystem.lua", desc: "主子系统/客户端UI入口" }
+                ]
+            },
+            {
+                section: "Gameplay / Skill",
+                icon: "⚔️",
+                files: [
+                    { name: "SkillConfig.lua", desc: "技能配置" }
+                ],
+                subsections: [
+                    {
+                        title: "SkillAction（技能动作）",
+                        files: [
+                            { name: "SkillAction_ChangeTrapState.lua", desc: "切换陷阱状态" },
+                            { name: "SkillAction_TakeTrap.lua", desc: "消耗陷阱道具" }
+                        ]
+                    },
+                    {
+                        title: "SkillCondition（技能条件）",
+                        files: [
+                            { name: "SkillCondition_TrapCheckArea.lua", desc: "陷阱区域检测条件" }
+                        ]
+                    },
+                    {
+                        title: "SkillData / Item",
+                        files: [
+                            { name: "Skill_Template_RecoverEnergy_4300950.lua", desc: "恢复能量技能" }
+                        ]
+                    },
+                    {
+                        title: "SkillData / Weapon",
+                        files: [
+                            { name: "Skill_Melee_Pan_4300951.lua", desc: "平底锅技能" },
+                            { name: "Skill_Trap_4300952.lua", desc: "陷阱技能" }
+                        ]
+                    }
+                ]
+            },
+            {
+                section: "Gameplay / Backpack",
+                icon: "🎒",
+                files: [
+                    { name: "MeleeWeaponItemHandle.lua", desc: "近战武器物品处理" }
+                ]
+            },
+            {
+                section: "Gameplay / Component",
+                icon: "🧩",
+                files: [
+                    { name: "BackpackComponent.lua", desc: "背包组件" }
+                ]
+            },
+            {
+                section: "Gameplay / Utils",
+                icon: "🛠️",
+                files: [
+                    { name: "MiscUtils.lua", desc: "杂项工具" },
+                    { name: "SpawnUtils.lua", desc: "生成工具" },
+                    { name: "ShopUtils.lua", desc: "商店工具" }
+                ]
+            },
+            {
+                section: "Client（客户端入口 & UI）",
+                icon: "🖥️",
+                files: [
+                    { name: "ClientLogicEntry.lua", desc: "客户端启动入口" },
+                    { name: "InteractiveWithMonsterUI.lua", desc: "怪物交互UI" },
+                    { name: "InteractiveWithDoorUI.lua", desc: "门交互UI" },
+                    { name: "InteractiveWithDrawUIBP.lua", desc: "抽卡交互UI" },
+                    { name: "InteractiveWithShopUIBP.lua", desc: "商店交互UI" },
+                    { name: "CoinCountUIBP.lua", desc: "金币计数UI" },
+                    { name: "MonsterHeadUIBP.lua", desc: "怪物头顶UI" }
+                ]
+            },
+            {
+                section: "Client / Config",
+                icon: "📝",
+                files: [
+                    { name: "UIConfig.lua", desc: "UI配置总表" },
+                    { name: "NewbieGuideConfig.lua", desc: "新手引导配置" },
+                    { name: "ScreenMarkConfig.lua", desc: "屏幕标记配置" },
+                    { name: "TeamPanelUIConfig.lua", desc: "队伍面板配置" }
+                ]
+            },
+            {
+                section: "Client / Handler",
+                icon: "📡",
+                files: [
+                    { name: "PlanBT_PlanBTShop_Client_Handler.lua", desc: "商店Handler" },
+                    { name: "PlanBT_PlanBTDraw_Client_Handler.lua", desc: "抽卡Handler" },
+                    { name: "PlanBT_PlanBTSignIn_Client_Handler.lua", desc: "签到Handler" },
+                    { name: "PlanBT_PlanBTIllustratedGuide_Client_Handler.lua", desc: "图鉴Handler" },
+                    { name: "PlanBT_PlanBTPlayerData_Client_Handler.lua", desc: "玩家数据Handler" }
+                ]
+            },
+            {
+                section: "Client / 子系统（SubSystem & 功能模块）",
+                icon: "🔌",
+                files: [
+                    { name: "PlanBTMonsterBaseSubSystemClient.lua", desc: "客户端基地子系统" },
+                    { name: "PlanBTShopSubsystem_Client.lua", desc: "商店客户端子系统" },
+                    { name: "PlanBTDrawSubSystem_Client.lua", desc: "抽卡客户端子系统" },
+                    { name: "PlanBTSignInSubsystem_Client.lua", desc: "签到客户端子系统" },
+                    { name: "PlanBTIllustratedGuideSubsystem_Client.lua", desc: "图鉴客户端子系统" },
+                    { name: "PlanBTResultSubsystem.lua", desc: "结算子系统" }
+                ]
+            },
+            {
+                section: "Client / InGameUI",
+                icon: "🎯",
+                files: [
+                    { name: "FightingStateStateMachine.lua", desc: "战斗状态机" },
+                    { name: "PlayMonsterState.lua", desc: "养怪状态" }
+                ]
+            },
+            {
+                section: "Client / ShootingUI",
+                icon: "🔫",
+                files: [
+                    { name: "ShootingUIPanelMain.lua", desc: "射击UI面板" }
+                ]
+            },
+            {
+                section: "Client / UI（界面）",
+                icon: "🖼️",
+                files: [
+                    { name: "PlanBT_Layout_UIBP.lua", desc: "主布局UI" },
+                    { name: "PlanBTMainUI.lua", desc: "主UI入口" },
+                    { name: "PlayerRebirthUI.lua", desc: "重生UI" },
+                    { name: "FaceIntroUI.lua", desc: "新手引导UI" },
+                    { name: "PlanBT_BeginnerGuide_UIBP.lua", desc: "新手引导" },
+                    { name: "PlanBT_Ranking_Popup_UIBP.lua", desc: "排行榜弹窗" },
+                    { name: "OfflineEarningsPopup.lua", desc: "离线收益弹窗" }
+                ],
+                subsections: [
+                    {
+                        title: "Item（通用Item组件）",
+                        files: [
+                            { name: "PlanBT_Ranking_Item_UIBP.lua", desc: "排行榜Item" }
+                        ]
+                    },
+                    {
+                        title: "Shop（商店UI）",
+                        files: [
+                            { name: "PlanBT_Shop_Prop_UIBP.lua", desc: "商店道具页" },
+                            { name: "PlanBT_Prop_Item_UIBP.lua", desc: "道具Item" },
+                            { name: "PlanBT_Giftpack_Item_UIBP.lua", desc: "礼包Item" },
+                            { name: "PlanBT_PurchaseGoods_Details_Item_UIBP.lua", desc: "购买详情Item" },
+                            { name: "PlanBT_PurchaseGoods_Icon_Item_UIBP.lua", desc: "购买图标Item" }
+                        ]
+                    },
+                    {
+                        title: "SignIn（签到UI）",
+                        files: [
+                            { name: "PlanBT_SignIn_UIBP.lua", desc: "签到主界面" },
+                            { name: "PlanBT_SignIn_GetReward_UIBP.lua", desc: "获取奖励弹窗" },
+                            { name: "PlanBT_SignIn_Item_UIBP.lua", desc: "签到日Item" }
+                        ]
+                    },
+                    {
+                        title: "IllustratedGuide（图鉴UI）",
+                        files: [
+                            { name: "PlanBT_IllustratedGuide_UIBP.lua", desc: "图鉴主界面" },
+                            { name: "PlanBT_IllustratedGuide_Popup_UIBP.lua", desc: "图鉴弹窗" },
+                            { name: "PlanBT_IllustratedGuide_Item_UIBP.lua", desc: "图鉴Item" }
+                        ]
+                    },
+                    {
+                        title: "Turntable（转盘抽卡UI）",
+                        files: [
+                            { name: "PlanBT_Turntable_UIBP.lua", desc: "转盘主界面" },
+                            { name: "PlanBT_Turntable_DrawOne_UIBP.lua", desc: "单抽结果UI" },
+                            { name: "PlanBT_Turntable_DrawTen_UIBP.lua", desc: "十连结果UI" },
+                            { name: "PlanBT_Turntable_Item_UIBP.lua", desc: "转盘格子Item" },
+                            { name: "PlanBT_Lua_Item_UIBP.lua", desc: "通用Item" },
+                            { name: "PlanBT_Lua_DrawTen_Item.lua", desc: "十连Item" },
+                            { name: "PlanBT_Probability_Item_UIBP.lua", desc: "概率Item" }
+                        ]
+                    },
+                    {
+                        title: "Skin（皮肤UI）",
+                        files: [
+                            { name: "SkinUI.lua", desc: "皮肤选择界面" }
+                        ]
+                    },
+                    {
+                        title: "SkillButton（技能按钮UI）",
+                        files: [
+                            { name: "TrapSkillButtonUI.lua", desc: "陷阱技能按钮" }
+                        ]
+                    }
+                ]
+            },
+            {
+                section: "DS（服务器入口 & 模块）",
+                icon: "🖧",
+                files: [
+                    { name: "DSLogicEntry.lua", desc: "DS端启动入口" },
+                    { name: "PlanBTGameSettlementModule.lua", desc: "结算模块" },
+                    { name: "PlanBTSyncProcessModule.lua", desc: "同步进程模块" }
+                ]
+            },
+            {
+                section: "DS / Config",
+                icon: "📋",
+                files: [
+                    { name: "AIAccountConfig.lua", desc: "AI账号配置" },
+                    { name: "AIProcessModConfig.lua", desc: "AI流程模块配置" }
+                ]
+            },
+            {
+                section: "DS / Handler",
+                icon: "📡",
+                files: [
+                    { name: "PlanBT_PlanBTShop_DS_Handler.lua", desc: "商店Handler" },
+                    { name: "PlanBT_PlanBTDraw_DS_Handler.lua", desc: "抽卡Handler" },
+                    { name: "PlanBT_PlanBTSignIn_DS_Handler.lua", desc: "签到Handler" },
+                    { name: "PlanBT_PlanBTIllustratedGuide_DS_Handler.lua", desc: "图鉴Handler" },
+                    { name: "PlanBT_PlanBTPlayerData_DS_Handler.lua", desc: "玩家数据Handler" }
+                ]
+            },
+            {
+                section: "DS / Subsystem",
+                icon: "🔧",
+                files: [
+                    { name: "DSActiveSubsystem.lua", desc: "DS活跃管理" },
+                    { name: "MLAIPopulationSubSystem.lua", desc: "AI人口管理" },
+                    { name: "PlanBTCommerceSubsystem_DS.lua", desc: "商业子系统" }
+                ]
+            },
+            {
+                section: "DS / 功能子系统",
+                icon: "🔌",
+                files: [
+                    { name: "PlanBTShopSubsystem_DS.lua", desc: "商店子系统DS" },
+                    { name: "PlanBTDrawSubSystem_DS.lua", desc: "抽卡DS子系统" },
+                    { name: "PlanBTSignInSubsystem_DS.lua", desc: "签到DS子系统" },
+                    { name: "PlanBTIllustratedGuideSubsystem_DS.lua", desc: "图鉴DS子系统" }
+                ]
+            },
+            {
+                section: "DS / SimulateServer",
+                icon: "🧪",
+                files: [
+                    { name: "PlanBT_Simulate_LobbyServer.lua", desc: "模拟大厅服务器" }
+                ]
+            },
+            {
+                section: "DS / Utils",
+                icon: "🛠️",
+                files: [
+                    { name: "PlanBTShopUtils.lua", desc: "商店核心工具" },
+                    { name: "PlanBTShopItemUtils.lua", desc: "商品处理工具" },
+                    { name: "PlanBTCurrencyUtils.lua", desc: "货币管理工具" }
+                ]
+            },
+            {
+                section: "Dev（开发调试）",
+                icon: "🐛",
+                files: [
+                    { name: "GMCheatManager.lua", desc: "GM作弊管理器" },
+                    { name: "GMConfig.lua", desc: "GM配置" },
+                    { name: "GMFuncConfig.lua", desc: "GM功能函数配置" }
+                ]
+            },
+            {
+                section: "Common / UICanvas / Action",
+                icon: "🎬",
+                files: [
+                    { name: "CanvasAction_CameraMode.lua", desc: "摄像机模式" },
+                    { name: "CanvasAction_CustomTags.lua", desc: "自定义标签" },
+                    { name: "CanvasAction_EnterCameraDevice.lua", desc: "进入摄像机设备" },
+                    { name: "CanvasAction_EnterPet.lua", desc: "进入宠物模式" },
+                    { name: "CanvasAction_EnterTransformation.lua", desc: "进入变身模式" }
+                ]
+            },
+            {
+                section: "Tools",
+                icon: "🔨",
+                files: [
+                    { name: "PlanBT_GamePlay_Tools.lua", desc: "GamePlay工具" }
+                ]
+            }
+        ];
+
+        const STORAGE_KEY = 'planbt_todo_state';
+        let fileIndex = 0;
+
+        function loadState() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+            } catch { return {}; }
+        }
+
+        function saveState() {
+            const state = {};
+            document.querySelectorAll('.file-checkbox').forEach(cb => {
+                if (cb.checked) state[cb.dataset.id] = true;
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function updateProgress() {
+            const all = document.querySelectorAll('.file-checkbox');
+            const checked = document.querySelectorAll('.file-checkbox:checked');
+            const total = all.length;
+            const done = checked.length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            document.getElementById('progressBar').style.width = pct + '%';
+            document.getElementById('progressText').textContent = `${done} / ${total} 已完成 (${pct}%)`;
+        }
+
+        function renderFiles(files, container, state) {
+            files.forEach(f => {
+                const id = 'file_' + fileIndex++;
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <input type="checkbox" class="file-checkbox" id="${id}" data-id="${id}" ${state[id] ? 'checked' : ''}>
+                    <label for="${id}">
+                        <span class="file-name">${f.name}</span>
+                        <span class="file-desc">${f.desc}</span>
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderList() {
+            const list = document.getElementById('todoList');
+            const state = loadState();
+            list.innerHTML = '';
+
+            data.forEach((group, gi) => {
+                const sec = document.createElement('div');
+                sec.className = 'section';
+
+                // 计算该 section 的文件总数
+                let totalFiles = (group.files || []).length;
+                if (group.subsections) {
+                    group.subsections.forEach(sub => totalFiles += sub.files.length);
+                }
+
+                sec.innerHTML = `
+                    <div class="section-header" data-target="sec_body_${gi}">
+                        <div class="left">
+                            <span class="arrow">▼</span>
+                            <span class="icon">${group.icon}</span>
+                            <h2>${group.section}</h2>
+                        </div>
+                        <span class="badge">${totalFiles} 个文件</span>
+                    </div>
+                    <div class="section-body" id="sec_body_${gi}"></div>
+                `;
+
+                const body = sec.querySelector('.section-body');
+
+                // 渲染主文件列表
+                if (group.files && group.files.length > 0) {
+                    renderFiles(group.files, body, state);
+                }
+
+                // 渲染子目录
+                if (group.subsections) {
+                    group.subsections.forEach((sub, si) => {
+                        const subDiv = document.createElement('div');
+                        subDiv.className = 'subsection';
+                        const subId = `sub_${gi}_${si}`;
+                        subDiv.innerHTML = `
+                            <div class="subsection-title" data-target="${subId}">
+                                <span class="arrow">▼</span>
+                                📁 ${sub.title}
+                            </div>
+                            <div class="subsection-body" id="${subId}"></div>
+                        `;
+                        const subBody = subDiv.querySelector('.subsection-body');
+                        renderFiles(sub.files, subBody, state);
+                        body.appendChild(subDiv);
+                    });
+                }
+
+                list.appendChild(sec);
+            });
+
+            // 绑定事件
+            document.querySelectorAll('.file-checkbox').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    saveState();
+                    updateProgress();
+                });
+            });
+
+            // 折叠/展开 section
+            document.querySelectorAll('.section-header').forEach(h => {
+                h.addEventListener('click', () => {
+                    const target = document.getElementById(h.dataset.target);
+                    const arrow = h.querySelector('.arrow');
+                    target.classList.toggle('hidden');
+                    arrow.classList.toggle('collapsed');
+                });
+            });
+
+            // 折叠/展开 subsection
+            document.querySelectorAll('.subsection-title').forEach(h => {
+                h.addEventListener('click', () => {
+                    const target = document.getElementById(h.dataset.target);
+                    const arrow = h.querySelector('.arrow');
+                    target.classList.toggle('hidden');
+                    arrow.classList.toggle('collapsed');
+                });
+            });
+
+            updateProgress();
+        }
+
+        function toggleAll(checked) {
+            document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = checked);
+            saveState();
+            updateProgress();
+        }
+
+        function expandAll(expand) {
+            document.querySelectorAll('.section-body').forEach(el => {
+                if (expand) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+            document.querySelectorAll('.subsection-body').forEach(el => {
+                if (expand) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+            document.querySelectorAll('.arrow').forEach(a => {
+                if (expand) a.classList.remove('collapsed');
+                else a.classList.add('collapsed');
+            });
+        }
+
+        function clearStorage() {
+            if (confirm('确定要重置所有进度吗？')) {
+                localStorage.removeItem(STORAGE_KEY);
+                fileIndex = 0;
+                renderList();
+            }
+        }
+
+        // 初始化
+        renderList();
+    </script>
+</body>
+</html>
